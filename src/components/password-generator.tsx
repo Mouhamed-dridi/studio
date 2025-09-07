@@ -2,8 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Clipboard, Loader2, Wand2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useEffect, useRef, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -52,7 +52,7 @@ export function PasswordGenerator() {
   const { toast } = useToast();
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
 
-  const [state, formAction] = useFormState(generatePasswordAction, initialState);
+  const [state, formAction] = useActionState(generatePasswordAction, initialState);
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
@@ -78,8 +78,7 @@ export function PasswordGenerator() {
           title: 'Success!',
           description: 'A new secure password has been generated and saved.',
         });
-      } else if (state.errors) {
-        // This can be expanded to show specific field errors
+      } else if (state.errors || state.message === 'An unexpected error occurred.') {
         toast({
           variant: 'destructive',
           title: 'Uh oh! Something went wrong.',
