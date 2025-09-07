@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePasswordStore } from '@/hooks/use-password-store';
 
@@ -40,16 +41,18 @@ function SubmitButton() {
   );
 }
 
+const initialState = {
+  message: '',
+  errors: null,
+  password: null,
+};
+
 export function PasswordGenerator() {
   const { addPassword } = usePasswordStore();
   const { toast } = useToast();
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
 
-  const [state, formAction] = useFormState(generatePasswordAction, {
-    message: '',
-    errors: null,
-    password: null,
-  });
+  const [state, formAction] = useFormState(generatePasswordAction, initialState);
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
