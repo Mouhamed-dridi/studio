@@ -21,13 +21,14 @@ export async function sendPasswordByEmail(payload: EmailPayload) {
 
   const { to, username, password, date } = result.data;
 
+  // For Elastic Email, the 'user' is the API Key.
   const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_SERVER_HOST,
     port: Number(process.env.EMAIL_SERVER_PORT),
     secure: Number(process.env.EMAIL_SERVER_PORT) === 465,
     auth: {
-      user: process.env.EMAIL_SERVER_USER,
-      pass: process.env.EMAIL_SERVER_PASS,
+      user: process.env.EMAIL_SERVER_PASS, // For ElasticEmail, user is the API Key
+      pass: process.env.EMAIL_SERVER_PASS, // And password is the same API Key
     },
   });
 
