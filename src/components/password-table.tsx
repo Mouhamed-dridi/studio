@@ -197,6 +197,26 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
     }
   };
 
+  const handleDownloadArchiveXlsx = () => {
+    const data = archivedPasswords.map(p => ({
+      Username: p.username,
+      Password: p.password,
+      'Date of Deletion': new Date(p.deletionDate).toLocaleString(),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Archived Passwords');
+
+    // Auto-size columns
+    const maxWidths = Object.keys(data[0] || {}).map(key =>
+      Math.max(key.length, ...data.map(row => String(row[key as keyof typeof row]).length))
+    );
+    worksheet['!cols'] = maxWidths.map(w => ({ wch: w + 2 }));
+
+    XLSX.writeFile(workbook, `passgenius_archive_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -207,10 +227,20 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
       </DialogTrigger>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Archived Passwords</DialogTitle>
-          <DialogDescription>
-            View and manage passwords that have been archived.
-          </DialogDescription>
+           <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Archived Passwords</DialogTitle>
+              <DialogDescription className="mt-2">
+                View and manage passwords that have been archived.
+              </DialogDescription>
+            </div>
+            {archivedPasswords.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleDownloadArchiveXlsx}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Archive
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         <TooltipProvider>
           <div className="mt-4 max-h-[60vh] overflow-y-auto">
