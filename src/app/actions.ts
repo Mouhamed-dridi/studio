@@ -21,14 +21,14 @@ export async function sendPasswordByEmail(payload: EmailPayload) {
 
   const { to, username, password, date } = result.data;
 
-  // For Elastic Email, the 'user' is the API Key.
+  // For Elastic Email, both 'user' and 'pass' are the API Key.
   const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_SERVER_HOST,
     port: Number(process.env.EMAIL_SERVER_PORT),
     secure: Number(process.env.EMAIL_SERVER_PORT) === 465,
     auth: {
-      user: process.env.EMAIL_SERVER_PASS, // For ElasticEmail, user is the API Key
-      pass: process.env.EMAIL_SERVER_PASS, // And password is the same API Key
+      user: process.env.ELASTIC_EMAIL_API_KEY,
+      pass: process.env.ELASTIC_EMAIL_API_KEY,
     },
   });
 
@@ -56,7 +56,6 @@ export async function sendPasswordByEmail(payload: EmailPayload) {
       html: emailHtml,
     });
     
-    // For testing with Ethereal, you can log the preview URL
     console.log("Message sent: %s", info.messageId);
     if (process.env.EMAIL_SERVER_HOST?.includes('ethereal.email')) {
       console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
@@ -64,7 +63,8 @@ export async function sendPasswordByEmail(payload: EmailPayload) {
 
     return { success: true };
   } catch (error) {
-    console.error('Error sending email:', error);
-    return { success: false, error: 'Failed to send email. Check server logs for details.' };
+    console.error('Full error object:', JSON.stringify(error, null, 2));
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return { success: false, error: `Failed to send email. Server log: ${errorMessage}` };
   }
 }
