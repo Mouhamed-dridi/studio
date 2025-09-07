@@ -45,6 +45,9 @@ export async function sendPasswordByEmail(payload: EmailPayload) {
   `;
 
   try {
+    // Verify connection configuration
+    await transporter.verify();
+
     const info = await transporter.sendMail({
       from: `PassGenius <${process.env.EMAIL_FROM}>`,
       to: to,
@@ -54,11 +57,13 @@ export async function sendPasswordByEmail(payload: EmailPayload) {
     
     // For testing with Ethereal, you can log the preview URL
     console.log("Message sent: %s", info.messageId);
-    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    if (process.env.EMAIL_SERVER_HOST?.includes('ethereal.email')) {
+      console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    }
 
     return { success: true };
   } catch (error) {
     console.error('Error sending email:', error);
-    return { success: false, error: 'An unexpected error occurred.' };
+    return { success: false, error: 'Failed to send email. Check server logs for details.' };
   }
 }
