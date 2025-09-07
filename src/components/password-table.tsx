@@ -1,13 +1,19 @@
 'use client';
 
-import { Download, Eye, EyeOff, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, Eye, EyeOff, Trash2, Mail } from 'lucide-react';
+import { useEffect, useState, useTransition } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePasswordStore, type PasswordRecord } from '@/hooks/use-password-store';
+import { useToast } from '@/hooks/use-toast';
+import { sendPasswordByEmail } from '@/app/actions';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +25,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Input } from './ui/input';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 
 
 function PasswordCell({ password }: { password: string }) {
@@ -33,6 +51,102 @@ function PasswordCell({ password }: { password: string }) {
     </div>
   );
 }
+
+const emailFormSchema = z.object({
+  email: z.string().email('Please enter a valid email address.'),
+});
+
+type EmailFormSchema = z.infer<typeof emailFormSchema>;
+
+
+function SendEmailDialog({ record }: { record: PasswordRecord }) {
+  const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const form = useForm<EmailFormSchema>({
+    resolver: zodResolver(emailFormSchema),
+    defaultValues: { email: '' },
+  });
+
+  const handleSubmit = (values: EmailFormSchema) => {
+    startTransition(async () => {
+      const result = await sendPasswordByEmail({
+        to: values.email,
+        username: record.username,
+        password: record.password,
+        date: record.date,
+      });
+
+      if (result.success) {
+        toast({
+          title: 'Email Sent!',
+          description: `Password details sent to ${values.email}.`,
+        });
+        setOpen(false);
+        form.reset();
+      } else {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to send email.',
+          variant: 'destructive',
+        });
+      }
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <Mail className="h-4 w-4 text-primary" />
+            </Button>
+          </DialogTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Send by Email</p>
+        </TooltipContent>
+      </Tooltip>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send Password by Email</DialogTitle>
+          <DialogDescription>
+            Enter the email address to send the password for <span className="font-bold">{record.username}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recipient Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="recipient@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? 'Sending...' : 'Send Email'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 export function PasswordTable() {
   const { passwords, removePassword } = usePasswordStore();
@@ -118,34 +232,37 @@ export function PasswordTable() {
                         <PasswordCell password={record.password} />
                       </TableCell>
                        <TableCell className="text-right">
-                        <AlertDialog>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(record)}>
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Delete Record</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the password record for <span className="font-bold">{record.username}</span>.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center justify-end gap-2">
+                           <SendEmailDialog record={record} />
+                           <AlertDialog>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                 <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(record)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Delete Record</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the password record for <span className="font-bold">{record.username}</span>.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
