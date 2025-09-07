@@ -1,8 +1,33 @@
-import { KeyRound } from 'lucide-react';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { KeyRound, LogOut } from 'lucide-react';
 import { PasswordGenerator } from '@/components/password-generator';
 import { PasswordTable } from '@/components/password-table';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('isAuthenticated');
+    if (isAuthenticated !== 'true') {
+      router.replace('/login');
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    toast({
+      title: 'Logged Out',
+      description: 'You have been successfully logged out.',
+    });
+    router.push('/login');
+  };
+
   return (
     <div className="flex flex-col min-h-dvh bg-background">
       <header className="sticky top-0 z-10 border-b bg-card/80 backdrop-blur-sm">
@@ -14,6 +39,10 @@ export default function Home() {
                 PassGenius
               </h1>
             </div>
+            <Button variant="outline" size="sm" onClick={handleLogout} aria-label="Log out">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
           </div>
         </div>
       </header>
