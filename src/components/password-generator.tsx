@@ -108,7 +108,7 @@ export function PasswordGenerator() {
         <form
           ref={formRef}
           action={formAction}
-          onSubmit={form.handleSubmit(() => formRef.current?.requestSubmit())}
+          onSubmit={form.handleSubmit(() => form.trigger())}
           className="space-y-6"
         >
           <CardContent className="space-y-4">
