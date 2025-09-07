@@ -188,36 +188,38 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
             View passwords that have been archived.
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4 max-h-[60vh] overflow-y-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Password</TableHead>
-                <TableHead>Date Deleted</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {archivedPasswords.length > 0 ? (
-                archivedPasswords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell className="font-medium">{record.username}</TableCell>
-                    <TableCell>
-                      <PasswordCell password={record.password} />
-                    </TableCell>
-                    <TableCell>{new Date(record.deletionDate).toLocaleString()}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
+        <TooltipProvider>
+          <div className="mt-4 max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
-                    No archived passwords.
-                  </TableCell>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Password</TableHead>
+                  <TableHead>Date Deleted</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {archivedPasswords.length > 0 ? (
+                  archivedPasswords.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium">{record.username}</TableCell>
+                      <TableCell>
+                        <PasswordCell password={record.password} />
+                      </TableCell>
+                      <TableCell>{new Date(record.deletionDate).toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      No archived passwords.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TooltipProvider>
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">
