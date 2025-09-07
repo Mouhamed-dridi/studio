@@ -25,7 +25,7 @@ type FormSchema = z.infer<typeof formSchema>;
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full sm:w-auto" disabled={pending} aria-label="Generate Password">
+    <Button type="submit" disabled={pending} aria-label="Generate Password">
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -78,6 +78,8 @@ export function PasswordGenerator() {
           title: 'Success!',
           description: 'A new secure password has been generated and saved.',
         });
+        form.reset();
+        setGeneratedPassword(null);
       } else if (state.errors || state.message === 'An unexpected error occurred.') {
         toast({
           variant: 'destructive',
@@ -108,7 +110,6 @@ export function PasswordGenerator() {
         <form
           ref={formRef}
           action={formAction}
-          onSubmit={form.handleSubmit(() => form.trigger())}
           className="space-y-6"
         >
           <CardContent className="space-y-4">
@@ -125,19 +126,27 @@ export function PasswordGenerator() {
                 </FormItem>
               )}
             />
-            {generatedPassword && (
+            {state.password && (
               <div className="space-y-2">
                 <Label htmlFor="generated-password">Generated Password</Label>
                 <div className="flex gap-2">
-                  <Input id="generated-password" value={generatedPassword} readOnly className="font-mono" />
-                  <Button variant="outline" size="icon" onClick={handleCopyToClipboard} type="button" aria-label="Copy password">
+                  <Input id="generated-password" value={state.password} readOnly className="font-mono" />
+                  <Button variant="outline" size="icon" onClick={() => {
+                     if (state.password) {
+                      navigator.clipboard.writeText(state.password);
+                      toast({
+                        title: 'Copied!',
+                        description: 'Password copied to clipboard.',
+                      });
+                    }
+                  }} type="button" aria-label="Copy password">
                     <Clipboard className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             )}
           </CardContent>
-          <CardFooter>
+          <CardFooter className="justify-center">
             <SubmitButton />
           </CardFooter>
         </form>
