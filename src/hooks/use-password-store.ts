@@ -9,16 +9,29 @@ export type PasswordRecord = {
   date: string;
 };
 
+export type ArchivedPasswordRecord = PasswordRecord & {
+  deletionDate: string;
+};
+
 type PasswordStore = {
   passwords: PasswordRecord[];
+  archivedPasswords: ArchivedPasswordRecord[];
   addPassword: (record: PasswordRecord) => void;
-  removePassword: (id: string) => void;
+  archivePassword: (id: string) => void;
 };
 
 const PASSWORD_STORAGE_KEY = 'passgenius-passwords';
+const ARCHIVE_STORAGE_KEY = 'passgenius-archive';
 
 // We use a listener pattern to sync state across multiple components using the hook.
-let memoryState: PasswordRecord[] = [];
+let memoryState: {
+  passwords: PasswordRecord[];
+  archivedPasswords: ArchivedPasswordRecord[];
+} = {
+  passwords: [],
+  archivedPasswords: [],
+};
+
 const listeners: Set<() => void> = new Set();
 
 const broadcast = () => {
@@ -28,13 +41,18 @@ const broadcast = () => {
 const loadInitialState = () => {
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem(PASSWORD_STORAGE_KEY);
-      if (stored) {
-        memoryState = JSON.parse(stored);
-        broadcast();
+      const storedPasswords = localStorage.getItem(PASSWORD_STORAGE_KEY);
+      const storedArchive = localStorage.getItem(ARCHIVE_STORAGE_KEY);
+      
+      if (storedPasswords) {
+        memoryState.passwords = JSON.parse(storedPasswords);
       }
+      if (storedArchive) {
+        memoryState.archivedPasswords = JSON.parse(storedArchive);
+      }
+      broadcast();
     } catch (error) {
-      console.error('Failed to load passwords from localStorage', error);
+      console.error('Failed to load state from localStorage', error);
     }
   }
 };
@@ -44,13 +62,14 @@ if (typeof window !== 'undefined') {
     loadInitialState();
 }
 
-
 export const usePasswordStore = (): PasswordStore => {
-  const [passwords, setPasswords] = useState<PasswordRecord[]>(memoryState);
+  const [passwords, setPasswords] = useState<PasswordRecord[]>(memoryState.passwords);
+  const [archivedPasswords, setArchivedPasswords] = useState<ArchivedPasswordRecord[]>(memoryState.archivedPasswords);
 
   useEffect(() => {
     const listener = () => {
-      setPasswords(memoryState);
+      setPasswords(memoryState.passwords);
+      setArchivedPasswords(memoryState.archivedPasswords);
     };
     listeners.add(listener);
     // Initial sync
@@ -60,25 +79,36 @@ export const usePasswordStore = (): PasswordStore => {
     };
   }, []);
 
-  const updateAndPersist = (newPasswords: PasswordRecord[]) => {
-    memoryState = newPasswords;
+  const updateAndPersist = (newState: typeof memoryState) => {
+    memoryState = newState;
     try {
-      localStorage.setItem(PASSWORD_STORAGE_KEY, JSON.stringify(newPasswords));
+      localStorage.setItem(PASSWORD_STORAGE_KEY, JSON.stringify(newState.passwords));
+      localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(newState.archivedPasswords));
     } catch (error) {
-      console.error('Failed to save passwords to localStorage', error);
+      console.error('Failed to save state to localStorage', error);
     }
     broadcast();
   };
 
   const addPassword = useCallback((record: PasswordRecord) => {
-    const newPasswords = [record, ...memoryState];
-    updateAndPersist(newPasswords);
+    const newPasswords = [record, ...memoryState.passwords];
+    updateAndPersist({ ...memoryState, passwords: newPasswords });
   }, []);
 
-  const removePassword = useCallback((id: string) => {
-    const newPasswords = memoryState.filter((p) => p.id !== id);
-    updateAndPersist(newPasswords);
+  const archivePassword = useCallback((id: string) => {
+    const passwordToArchive = memoryState.passwords.find((p) => p.id === id);
+    if (!passwordToArchive) return;
+
+    const newArchivedRecord: ArchivedPasswordRecord = {
+      ...passwordToArchive,
+      deletionDate: new Date().toISOString(),
+    };
+
+    const newPasswords = memoryState.passwords.filter((p) => p.id !== id);
+    const newArchivedPasswords = [newArchivedRecord, ...memoryState.archivedPasswords];
+
+    updateAndPersist({ passwords: newPasswords, archivedPasswords: newArchivedPasswords });
   }, []);
 
-  return { passwords, addPassword, removePassword };
+  return { passwords, archivedPasswords, addPassword, archivePassword };
 };

@@ -1,16 +1,17 @@
 'use client';
 
-import { Download, Eye, EyeOff, Trash2, Mail } from 'lucide-react';
+import { Download, Eye, EyeOff, Trash2, Mail, Archive, Clipboard } from 'lucide-react';
 import { useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import * as XLSX from 'xlsx';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { usePasswordStore, type PasswordRecord } from '@/hooks/use-password-store';
+import { usePasswordStore, type PasswordRecord, type ArchivedPasswordRecord } from '@/hooks/use-password-store';
 import { useToast } from '@/hooks/use-toast';
 import { sendPasswordByEmail } from '@/app/actions';
 
@@ -23,7 +24,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
   Dialog,
@@ -38,16 +38,41 @@ import {
 import { Input } from './ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 
-
 function PasswordCell({ password }: { password: string }) {
   const [revealed, setRevealed] = useState(false);
+  const { toast } = useToast();
+
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(password);
+    toast({
+      title: 'Copied!',
+      description: 'Password copied to clipboard.',
+    });
+  };
 
   return (
     <div className="flex items-center gap-2">
       <span className="font-mono text-sm">{revealed ? password : '••••••••••••'}</span>
-      <Button variant="ghost" size="icon" onClick={() => setRevealed(!revealed)} aria-label={revealed ? "Hide password" : "Show password"}>
-        {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" onClick={() => setRevealed(!revealed)} aria-label={revealed ? "Hide password" : "Show password"}>
+            {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{revealed ? 'Hide' : 'Show'} password</p>
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" onClick={handleCopyToClipboard} aria-label="Copy password">
+            <Clipboard className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Copy password</p>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -147,41 +172,97 @@ function SendEmailDialog({ record }: { record: PasswordRecord }) {
   );
 }
 
+function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPasswordRecord[] }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Archive className="mr-2 h-4 w-4" />
+          Archive
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Archived Passwords</DialogTitle>
+          <DialogDescription>
+            View passwords that have been archived.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="mt-4 max-h-[60vh] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Username</TableHead>
+                <TableHead>Password</TableHead>
+                <TableHead>Date Deleted</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {archivedPasswords.length > 0 ? (
+                archivedPasswords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell className="font-medium">{record.username}</TableCell>
+                    <TableCell>
+                      <PasswordCell password={record.password} />
+                    </TableCell>
+                    <TableCell>{new Date(record.deletionDate).toLocaleString()}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={3} className="h-24 text-center">
+                    No archived passwords.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function PasswordTable() {
-  const { passwords, removePassword } = usePasswordStore();
+  const { passwords, archivePassword, archivedPasswords } = usePasswordStore();
   const [isClient, setIsClient] = useState(false);
-  const [recordToDelete, setRecordToDelete] = useState<PasswordRecord | null>(null);
+  const [recordToArchive, setRecordToArchive] = useState<PasswordRecord | null>(null);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const handleDownloadCsv = () => {
-    const headers = ['Username', 'Date', 'Password'];
-    const rows = passwords.map(p => [
-      `"${p.username.replace(/"/g, '""')}"`,
-      p.date,
-      `"${p.password.replace(/"/g, '""')}"`,
-    ]);
+  const handleDownloadXlsx = () => {
+    const data = passwords.map(p => ({
+      Username: p.username,
+      Password: p.password,
+      'Date of Generation': new Date(p.date).toLocaleString(),
+    }));
 
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.href) {
-      URL.revokeObjectURL(link.href);
-    }
-    link.href = URL.createObjectURL(blob);
-    link.download = `passgenius_backup_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Passwords');
+
+    // Auto-size columns
+    const maxWidths = Object.keys(data[0] || {}).map(key => 
+      Math.max(key.length, ...data.map(row => String(row[key as keyof typeof row]).length))
+    );
+    worksheet['!cols'] = maxWidths.map(w => ({ wch: w + 2 }));
+
+    XLSX.writeFile(workbook, `passgenius_backup_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
   
-  const confirmDelete = () => {
-    if (recordToDelete) {
-      removePassword(recordToDelete.id);
-      setRecordToDelete(null);
+  const confirmArchive = () => {
+    if (recordToArchive) {
+      archivePassword(recordToArchive.id);
+      setRecordToArchive(null);
     }
   };
 
@@ -203,12 +284,15 @@ export function PasswordTable() {
     <Card className="shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Password Vault</CardTitle>
-        {passwords.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleDownloadCsv}>
-            <Download className="mr-2 h-4 w-4" />
-            Download CSV
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {archivedPasswords.length > 0 && <ArchiveDialog archivedPasswords={archivedPasswords} />}
+          {passwords.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleDownloadXlsx}>
+              <Download className="mr-2 h-4 w-4" />
+              Download .XLS
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <TooltipProvider>
@@ -234,30 +318,28 @@ export function PasswordTable() {
                        <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                            <SendEmailDialog record={record} />
-                           <AlertDialog>
+                           <AlertDialog open={!!recordToArchive} onOpenChange={(open) => !open && setRecordToArchive(null)}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                 <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(record)}>
+                                 <Button variant="ghost" size="icon" onClick={() => setRecordToArchive(record)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
-                                </AlertDialogTrigger>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Delete Record</p>
+                                <p>Archive Record</p>
                               </TooltipContent>
                             </Tooltip>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Are you sure you want to archive this record?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the password record for <span className="font-bold">{record.username}</span>.
+                                  This will move the password record for <span className="font-bold">{recordToArchive?.username}</span> to the archive. You can view it later from the archive section.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Delete
+                                <AlertDialogCancel onClick={() => setRecordToArchive(null)}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={confirmArchive} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Archive
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
