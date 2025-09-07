@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, Eye, EyeOff, Trash2, Mail, Archive, Clipboard } from 'lucide-react';
+import { Download, Eye, EyeOff, Trash2, Mail, Archive, Clipboard, RotateCcw } from 'lucide-react';
 import { useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -173,6 +173,30 @@ function SendEmailDialog({ record }: { record: PasswordRecord }) {
 }
 
 function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPasswordRecord[] }) {
+  const { restorePassword, permanentlyDeletePassword } = usePasswordStore();
+  const { toast } = useToast();
+  const [recordToDelete, setRecordToDelete] = useState<ArchivedPasswordRecord | null>(null);
+
+  const handleRestore = (id: string) => {
+    restorePassword(id);
+    toast({
+      title: 'Restored!',
+      description: 'The password has been restored to the main vault.',
+    });
+  };
+  
+  const confirmDelete = () => {
+    if (recordToDelete) {
+      permanentlyDeletePassword(recordToDelete.id);
+      toast({
+        title: 'Deleted!',
+        description: 'The password has been permanently deleted.',
+        variant: 'destructive',
+      });
+      setRecordToDelete(null);
+    }
+  };
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -181,11 +205,11 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
           Archive
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>Archived Passwords</DialogTitle>
           <DialogDescription>
-            View passwords that have been archived.
+            View and manage passwords that have been archived.
           </DialogDescription>
         </DialogHeader>
         <TooltipProvider>
@@ -196,6 +220,7 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
                   <TableHead>Username</TableHead>
                   <TableHead>Password</TableHead>
                   <TableHead>Date Deleted</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -204,14 +229,38 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">{record.username}</TableCell>
                       <TableCell>
-                        <PasswordCell password={record.password} />
+                         <PasswordCell password={record.password} />
                       </TableCell>
                       <TableCell>{new Date(record.deletionDate).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => handleRestore(record.id)}>
+                                <RotateCcw className="h-4 w-4 text-green-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Restore Password</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => setRecordToDelete(record)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete Permanently</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={4} className="h-24 text-center">
                       No archived passwords.
                     </TableCell>
                   </TableRow>
@@ -220,6 +269,24 @@ function ArchiveDialog({ archivedPasswords }: { archivedPasswords: ArchivedPassw
             </Table>
           </div>
         </TooltipProvider>
+
+        <AlertDialog open={!!recordToDelete} onOpenChange={(open) => !open && setRecordToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the password record for <span className="font-bold">{recordToDelete?.username}</span>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">
@@ -304,6 +371,7 @@ export function PasswordTable() {
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Date Generated</TableHead>
+
                   <TableHead>Password</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -320,7 +388,7 @@ export function PasswordTable() {
                        <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                            <SendEmailDialog record={record} />
-                           <AlertDialog open={!!recordToArchive} onOpenChange={(open) => !open && setRecordToArchive(null)}>
+                           <AlertDialog open={!!recordToArchive && recordToArchive.id === record.id} onOpenChange={(open) => !open && setRecordToArchive(null)}>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                  <Button variant="ghost" size="icon" onClick={() => setRecordToArchive(record)}>

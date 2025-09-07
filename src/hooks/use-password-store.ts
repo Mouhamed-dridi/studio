@@ -18,6 +18,8 @@ type PasswordStore = {
   archivedPasswords: ArchivedPasswordRecord[];
   addPassword: (record: PasswordRecord) => void;
   archivePassword: (id: string) => void;
+  restorePassword: (id: string) => void;
+  permanentlyDeletePassword: (id: string) => void;
 };
 
 const PASSWORD_STORAGE_KEY = 'passgenius-passwords';
@@ -110,5 +112,23 @@ export const usePasswordStore = (): PasswordStore => {
     updateAndPersist({ passwords: newPasswords, archivedPasswords: newArchivedPasswords });
   }, []);
 
-  return { passwords, archivedPasswords, addPassword, archivePassword };
+  const restorePassword = useCallback((id: string) => {
+    const passwordToRestore = memoryState.archivedPasswords.find((p) => p.id === id);
+    if (!passwordToRestore) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { deletionDate, ...originalPassword } = passwordToRestore;
+
+    const newArchivedPasswords = memoryState.archivedPasswords.filter((p) => p.id !== id);
+    const newPasswords = [originalPassword, ...memoryState.passwords];
+    
+    updateAndPersist({ passwords: newPasswords, archivedPasswords: newArchivedPasswords });
+  }, []);
+
+  const permanentlyDeletePassword = useCallback((id: string) => {
+    const newArchivedPasswords = memoryState.archivedPasswords.filter((p) => p.id !== id);
+    updateAndPersist({ ...memoryState, archivedPasswords: newArchivedPasswords });
+  }, []);
+
+  return { passwords, archivedPasswords, addPassword, archivePassword, restorePassword, permanentlyDeletePassword };
 };
